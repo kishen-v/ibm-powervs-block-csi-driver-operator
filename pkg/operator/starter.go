@@ -148,10 +148,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		"servicemonitor.yaml",
 	)
 
-	if err != nil {
-		return err
-	}
-
 	klog.Info("Starting the informers")
 	go kubeInformersForNamespaces.Start(ctx.Done())
 	go dynamicInformers.Start(ctx.Done())
