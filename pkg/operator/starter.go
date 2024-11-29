@@ -4,6 +4,8 @@ import (
 	"context"
 	"time"
 
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/dynamic"
 	kubeclient "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -12,12 +14,14 @@ import (
 	opv1 "github.com/openshift/api/operator/v1"
 	configclient "github.com/openshift/client-go/config/clientset/versioned"
 	configinformers "github.com/openshift/client-go/config/informers/externalversions"
+	v1 "github.com/openshift/client-go/config/listers/config/v1"
 	"github.com/openshift/ibm-powervs-block-csi-driver-operator/assets"
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
 	"github.com/openshift/library-go/pkg/controller/factory"
 	"github.com/openshift/library-go/pkg/operator/csi/csicontrollerset"
 	"github.com/openshift/library-go/pkg/operator/csi/csidrivercontrollerservicecontroller"
 	"github.com/openshift/library-go/pkg/operator/csi/csidrivernodeservicecontroller"
+	dc "github.com/openshift/library-go/pkg/operator/deploymentcontroller"
 	goc "github.com/openshift/library-go/pkg/operator/genericoperatorclient"
 	"github.com/openshift/library-go/pkg/operator/v1helpers"
 )
@@ -30,6 +34,15 @@ const (
 	cloudCredSecretName   = "ibm-powervs-block-cloud-credentials"
 	metricsCertSecretName = "ibm-powervs-block-csi-driver-controller-metrics-serving-cert"
 	trustedCAConfigMap    = "ibm-powervs-block-csi-driver-trusted-ca-bundle"
+	infrastructureName    = "cluster"
+)
+
+var (
+	endPointKeyToEnvNameMap = map[string]string{
+		"iam": "IBMCLOUD_IAM_API_ENDPOINT",
+		"rc":  "IBMCLOUD_RESOURCE_CONTROLLER_API_ENDPOINT",
+		"pi":  "IBMCLOUD_POWER_API_ENDPOINT",
+	}
 )
 
 func RunOperator(ctx context.Context, controllerConfig *controllercmd.ControllerContext) error {
@@ -128,6 +141,7 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 			secretInformer,
 		),
 		csidrivercontrollerservicecontroller.WithReplicasHook(nodeInformer.Lister()),
+		withCustomEndPoint(infraInformer.Lister()),
 	).WithCSIDriverNodeService(
 		"PowerVSBlockDriverNodeServiceController",
 		assets.ReadFile,
@@ -147,7 +161,6 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 		assets.ReadFile,
 		"servicemonitor.yaml",
 	)
-
 	klog.Info("Starting the informers")
 	go kubeInformersForNamespaces.Start(ctx.Done())
 	go dynamicInformers.Start(ctx.Done())
@@ -159,4 +172,49 @@ func RunOperator(ctx context.Context, controllerConfig *controllercmd.Controller
 	<-ctx.Done()
 
 	return nil
+}
+
+func withCustomEndPoint(infraLister v1.InfrastructureLister) dc.DeploymentHookFunc {
+	return func(_ *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
+		infra, err := infraLister.Get(infrastructureName)
+		if err != nil {
+			return err
+		}
+		if infra.Status.PlatformStatus == nil || infra.Status.PlatformStatus.PowerVS == nil {
+			return nil
+		}
+		serviceEndPoints := infra.Status.PlatformStatus.PowerVS.ServiceEndpoints
+		if len(serviceEndPoints) == 0 {
+			return nil
+		}
+		var containerEnvVars []corev1.EnvVar
+		for _, serviceEndPoint := range serviceEndPoints {
+			containerEnvVars = append(containerEnvVars, corev1.EnvVar{
+				Name:  mappedOrCustomEndpoint(serviceEndPoint.Name),
+				Value: serviceEndPoint.URL,
+			})
+		}
+
+		for i := range deployment.Spec.Template.Spec.Containers {
+			container := &deployment.Spec.Template.Spec.Containers[i]
+			if container.Name != "csi-driver" {
+				continue
+			}
+			container.Env = append(container.Env, containerEnvVars...)
+			return nil
+		}
+		return nil
+	}
+}
+
+// mappedOrCustomEndpoint retrieves the corresponding value for shorthand endpoints
+// mentioned under 'serviceEndpoints', else returns the value passed as-is
+
+func mappedOrCustomEndpoint(endpoint string) string {
+	// Return the mapped environment keys.
+	if endPointKeyToEnvNameMap[endpoint] != "" {
+		return endPointKeyToEnvNameMap[endpoint]
+	}
+	// Return the endpoint as-is
+	return endpoint
 }
