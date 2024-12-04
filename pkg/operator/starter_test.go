@@ -64,15 +64,15 @@ func TestWithCustomEndPoint(t *testing.T) {
 			name: "when custom endpoints are specified",
 			customEndPoints: []v1.PowerVSServiceEndpoint{
 				{
-					Name: "iam",
+					Name: "IAM",
 					URL:  "https://iam.ibmcloud-test.com",
 				},
 				{
-					Name: "rc",
+					Name: "ResourceController",
 					URL:  "https://rc.ibmcloud-test.com",
 				},
 				{
-					Name: "pi",
+					Name: "Power",
 					URL:  "https://pi.ibmcloud-test.com",
 				},
 			},
@@ -127,15 +127,15 @@ func TestWithCustomEndPoint(t *testing.T) {
 			name: "when custom endpoints are specified along with endpoints that aren't related to the driver",
 			customEndPoints: []v1.PowerVSServiceEndpoint{
 				{
-					Name: "iam",
+					Name: "IAM",
 					URL:  "https://iam.ibmcloud-test.com",
 				},
 				{
-					Name: "rc",
+					Name: "ResourceController",
 					URL:  "https://rc.ibmcloud-test.com",
 				},
 				{
-					Name: "pi",
+					Name: "Power",
 					URL:  "https://pi.ibmcloud-test.com",
 				},
 				{

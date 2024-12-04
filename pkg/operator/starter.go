@@ -47,9 +47,9 @@ const (
 // the CSI Driver
 var (
 	endPointKeyToEnvNameMap = map[string]string{
-		"iam": "IBMCLOUD_IAM_API_ENDPOINT",
-		"rc":  "IBMCLOUD_RESOURCE_CONTROLLER_API_ENDPOINT",
-		"pi":  "IBMCLOUD_POWER_API_ENDPOINT",
+		"IAM":                "IBMCLOUD_IAM_API_ENDPOINT",
+		"ResourceController": "IBMCLOUD_RESOURCE_CONTROLLER_API_ENDPOINT",
+		"Power":              "IBMCLOUD_POWER_API_ENDPOINT",
 	}
 )
 
