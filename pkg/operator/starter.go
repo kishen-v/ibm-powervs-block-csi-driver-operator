@@ -224,6 +224,7 @@ func extractOperatorStatus(obj *unstructured.Unstructured, fieldManager string) 
 
 func withCustomEndPoint(infraLister v1.InfrastructureLister) dc.DeploymentHookFunc {
 	return func(_ *opv1.OperatorSpec, deployment *appsv1.Deployment) error {
+		klog.Info("Inside withCustomEndPoint")
 		infra, err := infraLister.Get(infrastructureName)
 		if err != nil {
 			return err
@@ -241,6 +242,7 @@ func withCustomEndPoint(infraLister v1.InfrastructureLister) dc.DeploymentHookFu
 				klog.Infof("Ignoring %q serviceEndpoint", serviceEndPoint.Name)
 				continue
 			}
+			klog.Infof("Adding customServiceEndpoint: %s-%s", endPointKeyToEnvNameMap[serviceEndPoint.Name], serviceEndPoint.URL)
 			containerEnvVars = append(containerEnvVars, corev1.EnvVar{
 				Name:  endPointKeyToEnvNameMap[serviceEndPoint.Name],
 				Value: serviceEndPoint.URL,
@@ -252,6 +254,7 @@ func withCustomEndPoint(infraLister v1.InfrastructureLister) dc.DeploymentHookFu
 			if container.Name != csiDriver {
 				continue
 			}
+			klog.Info("Appended withCustomEndPoint to csi-deployment")
 			container.Env = append(container.Env, containerEnvVars...)
 			return nil
 		}
